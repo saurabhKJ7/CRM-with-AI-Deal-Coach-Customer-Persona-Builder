@@ -1,0 +1,16 @@
+{
+  "name": "zoho-crm-clone-scripts",
+  "version": "1.0.0",
+  "description": "Database scripts for Zoho CRM Clone",
+  "main": "seed-data.js",
+  "scripts": {
+    "seed": "node seed-data.js",
+    "delete": "node delete-data.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.8",
+    "dotenv": "^16.5.0"
+  },
+  "author": "",
+  "license": "MIT"
+}

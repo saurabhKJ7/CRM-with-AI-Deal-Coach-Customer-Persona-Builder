@@ -1,0 +1,872 @@
+"use client"
+
+import * as React from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { useToast } from "@/hooks/use-toast"
+import { Plus, DollarSign, Calendar, User, Building, Percent, TrendingUp, Target, MessageSquare } from "lucide-react"
+import type { Deal, DealWithRelations, Contact, PaginatedResponse, ApiResponse } from "@/lib/types"
+import DealForm from "@/components/deals/DealForm"
+// import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
+import { Separator } from "@/components/ui/separator"
+import ConversationForm from "@/components/conversations/ConversationForm"
+import ConversationsList from "@/components/conversations/ConversationsList"
+import DealChatbot from "@/components/conversations/DealChatbot"
+// import { AppSidebar } from "@/components/app-sidebar"
+// import {
+//   Breadcrumb,
+//   BreadcrumbItem,
+//   BreadcrumbLink,
+//   BreadcrumbList,
+//   BreadcrumbPage,
+//   BreadcrumbSeparator,
+// } from "@/components/ui/breadcrumb"
+import { AppSidebar } from "@/components/app-sidebar"
+
+const stages: Array<{
+  id: Deal['stage']
+  title: string
+  color: string
+}> = [
+  { id: "lead", title: "Lead", color: "bg-gray-100 border-gray-300" },
+  { id: "qualified", title: "Qualified", color: "bg-blue-100 border-blue-300" },
+  { id: "proposal", title: "Proposal", color: "bg-yellow-100 border-yellow-300" },
+  { id: "negotiation", title: "Negotiation", color: "bg-orange-100 border-orange-300" },
+  { id: "won", title: "Won", color: "bg-green-100 border-green-300" },
+  { id: "lost", title: "Lost", color: "bg-red-100 border-red-300" },
+]
+
+export default function DealsPage() {
+  const [deals, setDeals] = React.useState<DealWithRelations[]>([])
+  const [contacts, setContacts] = React.useState<Contact[]>([])
+  const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
+  const [isConversationDialogOpen, setIsConversationDialogOpen] = React.useState(false)
+  const [isConversationsListOpen, setIsConversationsListOpen] = React.useState(false)
+  const [isChatbotOpen, setIsChatbotOpen] = React.useState(false)
+  const [selectedDeal, setSelectedDeal] = React.useState<DealWithRelations | null>(null)
+  const [draggedDeal, setDraggedDeal] = React.useState<DealWithRelations | null>(null)
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+  const { toast } = useToast()
+
+  // Fetch deals and contacts
+  const fetchDeals = async () => {
+    try {
+      setError(null);
+      // Use a cache-busting query parameter to ensure fresh data
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/deals?_t=${timestamp}`);
+      
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+      
+      const data = await response.json() as PaginatedResponse<DealWithRelations>;
+      console.log("Fetched deals:", data.data);
+      
+      // Ensure data.data is always an array
+      const dealsArray = Array.isArray(data.data) ? data.data : [];
+      
+      // Set the deals directly without merging to ensure a complete refresh
+      setDeals(dealsArray);
+      
+      return dealsArray;
+    } catch (error) {
+      console.error("Error fetching deals:", error);
+      setError(error instanceof Error ? error.message : "Failed to fetch deals");
+      toast({
+        title: "Error",
+        description: "Failed to fetch deals",
+        variant: "destructive",
+      });
+      return [];
+    }
+  }
+
+  const fetchContacts = async () => {
+    try {
+      const response = await fetch("/api/contacts");
+      
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+      
+      const data = await response.json() as PaginatedResponse<Contact>;
+      
+      // Ensure data.data is always an array
+      const contactsArray = Array.isArray(data.data) ? data.data : [];
+      
+      setContacts(contactsArray);
+    } catch (error) {
+      console.error("Error fetching contacts:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch contacts",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  React.useEffect(() => {
+    fetchDeals()
+    fetchContacts()
+  }, [])
+
+  const handleAddDeal = async (formData: FormData) => {
+    try {
+      const response = await fetch("/api/deals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(formData)),
+      })
+
+      const data = await response.json() as ApiResponse<Deal>
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Deal added successfully",
+        })
+        setIsAddDialogOpen(false)
+        fetchDeals()
+      } else {
+        throw new Error(data.error || "Failed to add deal")
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to add deal",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleEditDeal = async (formData: FormData) => {
+    if (!selectedDeal) return
+
+    try {
+      const response = await fetch(`/api/deals/${selectedDeal.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(formData)),
+      })
+
+      const data = await response.json() as ApiResponse<Deal>
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Deal updated successfully",
+        })
+        setIsEditDialogOpen(false)
+        setSelectedDeal(null)
+        fetchDeals()
+      } else {
+        throw new Error(data.error || "Failed to update deal")
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update deal",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDragStart = (deal: DealWithRelations) => {
+    setDraggedDeal(deal)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+  }
+
+  const handleDrop = async (e: React.DragEvent, newStage: Deal["stage"]) => {
+    e.preventDefault()
+    console.log("Drop event - Dragged deal:", draggedDeal, "New stage:", newStage);
+    
+    if (draggedDeal && draggedDeal.stage !== newStage) {
+      // Store a copy of the original dragged deal for potential rollback
+      const originalDeal = {...draggedDeal};
+      console.log("Original deal before update:", originalDeal);
+      
+      // Create updated deal with new stage
+      const updatedDeal = { 
+        ...draggedDeal, 
+        stage: newStage 
+      };
+      
+      // Immediately update the UI for better responsiveness
+      setDeals(prevDeals => {
+        // Replace the old deal with the updated one
+        const updatedDeals = prevDeals.map(deal => 
+          deal.id === draggedDeal.id ? updatedDeal : deal
+        );
+        console.log("Updated deals after local state change:", updatedDeals);
+        return updatedDeals;
+      });
+
+      try {
+        console.log("Sending API request to update deal stage:", draggedDeal.id, newStage);
+        const response = await fetch(`/api/deals/${draggedDeal.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stage: newStage }),
+        });
+
+        const responseData = await response.json();
+        console.log("API response:", response.status, responseData);
+
+        if (response.ok) {
+          // Update was successful
+          toast({
+            title: "Success",
+            description: `Deal moved to ${newStage.replace("-", " ")}`,
+          });
+          
+          // DO NOT fetch deals again to prevent race condition
+          // Instead, use the response data to update the specific deal
+          if (responseData.data && responseData.data.id) {
+            setDeals(prevDeals => {
+              return prevDeals.map(deal =>
+                deal.id === responseData.data.id ? { ...deal, ...responseData.data } : deal
+              );
+            });
+          }
+        } else {
+          console.error("API error updating deal:", responseData);
+          // Revert the change if API call fails
+          setDeals(prevDeals => {
+            const revertedDeals = prevDeals.map(deal => 
+              deal.id === draggedDeal.id ? originalDeal : deal
+            );
+            console.log("Reverting deals after API error:", revertedDeals);
+            return revertedDeals;
+          });
+          throw new Error(responseData.error || "Failed to update deal")
+        }
+      } catch (error) {
+        console.error("Exception during deal update:", error);
+        // Revert on error
+        setDeals(prevDeals => {
+          const revertedDeals = prevDeals.map(deal => 
+            deal.id === draggedDeal.id ? originalDeal : deal
+          );
+          console.log("Reverting deals after exception:", revertedDeals);
+          return revertedDeals;
+        });
+        toast({
+          title: "Error",
+          description: "Failed to update deal",
+          variant: "destructive",
+        });
+      }
+    }
+    setDraggedDeal(null);
+  }
+
+  const getDealsByStage = (stage: Deal["stage"] | 'all') => {
+    // Make sure deals is always an array
+    const safeDeals = Array.isArray(deals) ? deals : [];
+    
+    if (stage === 'all') {
+      return safeDeals;
+    }
+    
+    const filteredDeals = safeDeals.filter((deal) => deal.stage === stage);
+    console.log(`Deals in stage ${stage}:`, filteredDeals);
+    return filteredDeals;
+  }
+
+  const getStageValue = (stage: Deal["stage"]) => {
+    try {
+      return getDealsByStage(stage).reduce((sum, deal) => sum + (deal.amount || 0), 0);
+    } catch (err) {
+      console.error(`Error calculating stage value for ${stage}:`, err);
+      return 0;
+    }
+  }
+
+  const getTotalPipelineValue = () => {
+    try {
+      // Make sure deals is always an array
+      const safeDeals = Array.isArray(deals) ? deals : [];
+      
+      return safeDeals
+        .filter((deal) => !["won", "lost"].includes(deal.stage))
+        .reduce((sum, deal) => sum + (deal.amount || 0), 0);
+    } catch (err) {
+      console.error("Error calculating total pipeline value:", err);
+      return 0;
+    }
+  }
+
+  const getWonDealsValue = () => {
+    try {
+      // Make sure deals is always an array
+      const safeDeals = Array.isArray(deals) ? deals : [];
+      
+      return safeDeals
+        .filter((deal) => deal.stage === "won")
+        .reduce((sum, deal) => sum + (deal.amount || 0), 0);
+    } catch (err) {
+      console.error("Error calculating won deals value:", err);
+      return 0;
+    }
+  }
+
+  const DealCard = ({ deal }: { deal: DealWithRelations }) => (
+    <Card
+      class="mb-3 cursor-move hover:shadow-md transition-shadow border-l-4 border-l-blue-500"
+      draggable
+      onDragStart={() => handleDragStart(deal)}
+    >
+                          <CardContent className="p-4">
+                            <div className="space-y-3 relative">
+                              <div>
+                                <h4 className="font-medium text-gray-900 text-sm">{deal.title}</h4>
+                                <p className="text-xs text-gray-500 mt-1 line-clamp-2">{deal.description}</p>
+                              </div>
+
+                              <div className="flex items-center justify-between">
+                                                              <div className="flex items-center gap-1 text-sm font-medium text-green-600">
+                                                                <DollarSign className="h-3 w-3" />${(deal.amount || 0).toLocaleString()}
+                                                              </div>
+                                                              <Badge variant="outline" className="text-xs">
+                                                                <Percent className="h-3 w-3 mr-1" />
+                                                                {deal.probability}%
+                                                              </Badge>
+                                                            </div>
+
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2 text-xs text-gray-600">
+                                  <User className="h-3 w-3" />
+                                  {deal.contact?.first_name} {deal.contact?.last_name}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-gray-600">
+                                  <Building className="h-3 w-3" />
+                                  {deal.company?.name}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-gray-600">
+                                  <Calendar className="h-3 w-3" />
+                                  {format(new Date(deal.close_date), "MMM d, yyyy")}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                <span className="text-xs text-gray-500">
+                                  Owner: {deal.assignedTo?.full_name || 'Unassigned'}
+                                </span>
+                                <Badge variant="outline" className="text-xs">
+                                  {deal.stage.charAt(0).toUpperCase() + deal.stage.slice(1)}
+                                </Badge>
+                              </div>
+          
+          <div className="flex gap-1 mt-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex-1 text-xs flex items-center justify-center" 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setSelectedDeal(deal);
+                setIsConversationDialogOpen(true);
+              }}
+            >
+              <MessageSquare class="h-3 w-3 mr-1" />
+              <span class="hidden sm:inline">Log Conversation</span>
+              <span class="sm:hidden">Log</span>
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-10 p-0"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setSelectedDeal(deal);
+                setIsConversationsListOpen(true);
+              }}
+            >
+              <TrendingUp class="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+
+  if (loading || error) {
+    return (
+      <div>
+        <AppSidebar />
+        <div>
+          <div className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+            <div className="-ml-1"></div>
+            <div className="mr-2 h-4"></div>
+            <div>
+              <div>
+                <div>
+                  <a href="/">CRM</a>
+                </div>
+                <div></div>
+                <div>
+                  <span>Deals</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col items-center justify-center h-64">
+            {error ? (
+              <div>
+                <div className="text-lg mb-4 text-red-600">Error loading deals</div>
+                <div className="text-sm text-red-500 mb-4">{error}</div>
+                <Button 
+                  onClick={() => {
+                    setLoading(true);
+                    fetchDeals().then(() => setLoading(false));
+                  }}
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : (
+              <div>
+                <div className="text-lg mb-4">Loading deals...</div>
+                <div className="text-sm text-gray-500">Please wait while we refresh the pipeline data</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <AppSidebar />
+      <div>
+        <div className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+          <div className="-ml-1"></div>
+          <div className="mr-2 h-4"></div>
+          <div>
+            <div>
+              <div>
+                <a href="/">CRM</a>
+              </div>
+              <div></div>
+              <div>
+                <span>Deals</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-1 flex-col gap-6 p-6">
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Deals Pipeline</h1>
+                <p className="text-gray-600 mt-1">Track and manage your sales opportunities through the pipeline.</p>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    setLoading(true);
+                    fetchDeals().then(() => {
+                      toast({
+                        title: "Refreshed",
+                        description: "Deal pipeline has been refreshed"
+                      });
+                      setLoading(false);
+                    });
+                  }}
+                >
+                  Refresh Pipeline
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100"
+                  onClick={async () => {
+                    setLoading(true);
+                    try {
+                      const timestamp = new Date().getTime();
+                      const response = await fetch(`/api/deals/all?_t=${timestamp}`);
+                      if (response.ok) {
+                        const data = await response.json();
+                        if (data) {
+                          setDeals(data);
+                          toast({
+                            title: "All Deals Loaded",
+                            description: `Showing all ${data.length} deals, including hidden ones`,
+                          });
+                        } else {
+                          throw new Error("Failed to get deal data");
+                        }
+                      }
+                    } catch (error) {
+                      toast({
+                        title: "Error Loading All Deals",
+                        description: error.message,
+                      });
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                >
+                  Show All Deals
+                </Button>
+          <div className="flex items-center gap-2">
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button class="bg-blue-600 hover:bg-blue-700">
+                  <Plus class="h-4 w-4 mr-2" />
+                  Add Deal
+                </Button>
+              </DialogTrigger>
+            </Dialog>
+            <Button 
+              variant="default"
+              className="bg-purple-600 hover:bg-purple-700 flex items-center"
+              onClick={() => setIsChatbotOpen(true)}
+            >
+              <span className="mr-1">🤖</span>
+              <span className="hidden sm:inline">AI Deal Coach</span>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+            {/* Pipeline Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900">{deals.length}</div>
+                      <div className="text-sm text-gray-600">Total Deals</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-green-600" />
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900">${getTotalPipelineValue().toLocaleString()}</div>
+                      <div className="text-sm text-gray-600">Pipeline Value</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-purple-600" />
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900">${getWonDealsValue().toLocaleString()}</div>
+                      <div className="text-sm text-gray-600">Won Deals</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2">
+                    <Percent className="h-5 w-5 text-orange-600" />
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        {deals.length > 0
+                          ? Math.round((deals.filter((d) => d.stage === "won").length / deals.length) * 100)
+                          : 0}
+                        %
+                      </div>
+                      <div className="text-sm text-gray-600">Win Rate</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+      {/* Stage Summary */}
+      <div className="flex flex-nowrap gap-4 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-thin">
+        {stages.map((stage) => (
+          <Card key={stage.id} class="min-w-[200px]">
+            <CardContent class="p-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-900">{getDealsByStage(stage.id).length}</div>
+                <div className="text-sm text-gray-600">{stage.title}</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  ${getStageValue(stage.id).toLocaleString()}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+            <div className="space-y-6">
+              {/* Kanban Board */}
+              {/* Pipeline Columns */}
+              <div className="flex flex-nowrap gap-4 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-thin">
+                {stages.map((stage) => (
+                  <div
+                    key={stage.id}
+                    className="space-y-3 min-w-[280px] w-[280px]"
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, stage.id)}
+                  >
+                  <Card className={`${stage.color} border-2 border-dashed`}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-gray-700">
+                        {stage.title} ({getDealsByStage(stage.id).length})
+                      </CardTitle>
+                      <p className="text-xs text-gray-500">
+                        ${getStageValue(stage.id).toLocaleString()}
+                      </p>
+                    </CardHeader>
+                  </Card>
+
+            <div className="space-y-3 min-h-[250px] max-h-[calc(100vh-300px)] overflow-y-auto pr-1">
+              {getDealsByStage(stage.id).map((deal) => (
+                <DealCard key={deal.id} deal={deal} />
+              ))}
+            </div>
+            
+            {stage.id === 'lost' && getDealsByStage(stage.id).length === 0 && (
+              <Card className="border-dashed border-2 border-red-200 bg-red-50">
+                <CardContent class="p-4 text-center">
+                  <p className="text-sm text-red-600 mb-2">Missing lost deals?</p>
+                  <div className="flex flex-col gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="border-red-300 text-red-600 hover:bg-red-100"
+                      onClick={() => {
+                        setLoading(true);
+                        fetchDeals().then(() => {
+                            toast({
+                              title: "Refreshed",
+                              description: "Deal pipeline has been refreshed",
+                            });
+                            setLoading(false);
+                          });
+                        }}
+                      >
+                        Refresh Pipeline
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="border-yellow-300 text-yellow-600 hover:bg-yellow-100"
+                        onClick={async () => {
+                          setLoading(true);
+                          try {
+                            const timestamp = new Date().getTime();
+                            const response = await fetch(`/api/deals/all?_t=${timestamp}`);
+                            if (response.ok) {
+                              const data = await response.json();
+                              setDeals(data.data);
+                              toast({
+                                title: "All Deals Loaded",
+                                description: `Found ${data.data.length} deals in total`,
+                              });
+                            }
+                          } catch (error) {
+                            console.error("Error loading all deals:", error);
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                      >
+                        Show All Deals
+                      </Button>
+                      <Button 
+                        variant="default" 
+                        className="bg-purple-600 hover:bg-purple-700 ml-2 whitespace-nowrap"
+                        onClick={() => setIsChatbotOpen(true)}
+                      >
+                        <span class="mr-1">🤖</span>
+                        <span class="hidden sm:inline">AI Deal Coach</span>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Dialog component
+function DealsPage() {
+  // Hooks and state
+  const [isConversationDialogOpen, setIsConversationDialogOpen] = useState(false);
+  const [selectedDeal, setSelectedDeal] = useState(null);
+  const [deals, setDeals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { toast } = useToast();
+
+  return (
+    <>
+      <AppSidebar />
+      <SidebarInset>
+        <div className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+          <div className="-ml-1"></div>
+          <div className="mr-2 h-4"></div>
+          <div>
+            <div>
+              <div>
+                <a href="/">CRM</a>
+              </div>
+              <div></div>
+              <div>
+                <span>Deals</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="p-6">
+          <h1 className="text-3xl font-bold mb-6">Deals</h1>
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-center">
+                <div className="mb-4">Loading deals...</div>
+                <div className="text-sm text-gray-500">Please wait</div>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-center">
+                <div className="mb-4 text-red-500">Error: {error}</div>
+                <Button onClick={() => window.location.reload()}>
+                  Retry
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {deals.map(deal => (
+                <Card key={deal.id} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg">{deal.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-sm text-gray-500 mb-4">{deal.description}</div>
+                    <div className="flex justify-between items-center">
+                      <Badge>{deal.stage}</Badge>
+                      <div className="font-medium">${deal.amount}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      </SidebarInset>
+
+      {/* Conversation Form Dialog */}
+      <Dialog open={isConversationDialogOpen} onOpenChange={setIsConversationDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          {selectedDeal && (
+            <ConversationForm 
+              deal={selectedDeal}
+              onSuccess={() => {
+                setIsConversationDialogOpen(false);
+                toast({
+                  title: "Success",
+                  description: "Conversation logged successfully with AI analysis",
+                });
+              }} 
+              onCancel={() => setIsConversationDialogOpen(false)} 
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Conversations List Dialog */}
+      <Dialog open={isConversationsListOpen} onOpenChange={setIsConversationsListOpen}>
+        <DialogContent class="sm:max-w-6xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedDeal ? `Conversations for ${selectedDeal.title}` : 'Deal Conversations'}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedDeal && (
+            <ConversationsList deal={selectedDeal} />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Deal Chatbot Dialog */}
+      <Dialog open={isChatbotOpen} onOpenChange={setIsChatbotOpen}>
+        <DialogContent class="sm:max-w-4xl max-h-[90vh]">
+          <DealChatbot 
+            deals={deals} 
+            onConversationLogged={() => {
+              fetchDeals();
+              toast({
+                title: "Success",
+                description: "Conversation logged and analyzed by AI",
+              });
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Deal Dialog */}
+      <Dialog open={isAddDialogOpen ? true : undefined} onOpenChange={(value) => setIsAddDialogOpen(value)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Deal</DialogTitle>
+          </DialogHeader>
+          <DealForm
+            contacts={contacts}
+            onSubmitAction={handleAddDeal}
+            onCancelAction={() => setIsAddDialogOpen(false)}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  </>
+);
+}
+
+export default DealsPage;
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Deal</DialogTitle>
+          </DialogHeader>
+          {selectedDeal && (
+            <DealForm
+              deal={selectedDeal}
+              contacts={contacts}
+              onSubmitAction={handleEditDeal}
+              onCancelAction={() => {
+                setIsEditDialogOpen(false);
+                setSelectedDeal(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
