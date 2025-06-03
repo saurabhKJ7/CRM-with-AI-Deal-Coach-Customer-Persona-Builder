@@ -7,26 +7,16 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+// Removed tabs import as we're only showing the persona builder
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { 
-  User, 
-  Mail, 
-  Phone, 
-  Building, 
-  MapPin, 
   Edit, 
   Trash2, 
-  PlusCircle, 
-  FileText,
+  AlertCircle,
+  Phone,
+  Mail,
   Calendar,
-  DollarSign,
-  Clock,
-  ArrowUpRight,
-  CheckCircle,
-  XCircle,
-  Tag,
-  AlertCircle
+  FileText
 } from "lucide-react"
 import Link from "next/link"
 import { format } from "date-fns"
@@ -117,20 +107,7 @@ export default function ContactDetailsPage() {
     return colors[stage] || 'bg-gray-100 text-gray-800'
   }
 
-  const getActivityTypeIcon = (type: string) => {
-    switch (type) {
-      case 'call':
-        return <Phone className="h-4 w-4 text-blue-500" />
-      case 'email':
-        return <Mail className="h-4 w-4 text-purple-500" />
-      case 'meeting':
-        return <Calendar className="h-4 w-4 text-green-500" />
-      case 'task':
-        return <FileText className="h-4 w-4 text-orange-500" />
-      default:
-        return <Calendar className="h-4 w-4 text-gray-500" />
-    }
-  }
+  // Removed getActivityTypeIcon function as we no longer need it
 
   if (loading) {
     return (
@@ -239,7 +216,7 @@ export default function ContactDetailsPage() {
             <h1 className="text-3xl font-bold text-gray-900">
               {contact.first_name} {contact.last_name}
             </h1>
-            <p className="text-gray-600">{contact.job_title} at {contact.company?.name || 'Unknown Company'}</p>
+            <p className="text-gray-600">{contact.job_title} at {contact.companies?.name || 'Unknown Company'}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -267,273 +244,14 @@ export default function ContactDetailsPage() {
         </div>
       </div>
 
-      {/* Contact Details and Tabs */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Contact Info Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Contact Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-gray-600">
-                <Mail className="h-4 w-4" />
-                <span>Email</span>
-              </div>
-              <div className="pl-6 font-medium">{contact.email || 'No email provided'}</div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-gray-600">
-                <Phone className="h-4 w-4" />
-                <span>Phone</span>
-              </div>
-              <div className="pl-6 font-medium">{contact.phone || 'No phone provided'}</div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-gray-600">
-                <Building className="h-4 w-4" />
-                <span>Company</span>
-              </div>
-              <div className="pl-6 font-medium">{contact.company?.name || 'No company provided'}</div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-gray-600">
-                <MapPin className="h-4 w-4" />
-                <span>Address</span>
-              </div>
-              <div className="pl-6 font-medium">
-                {contact.address || 'No address provided'}
-                {contact.city && contact.state && (
-                  <div>{contact.city}, {contact.state} {contact.postal_code}</div>
-                )}
-                {contact.country && <div>{contact.country}</div>}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-gray-600">
-                <User className="h-4 w-4" />
-                <span>Owner</span>
-              </div>
-              <div className="pl-6 font-medium">{contact.assigned_to || 'Unassigned'}</div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-gray-600">
-                <Tag className="h-4 w-4" />
-                <span>Tags</span>
-              </div>
-              <div className="pl-6">
-                {contact.tags && contact.tags.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {contact.tags.map((tag: string, index: number) => (
-                      <Badge key={index} variant="secondary">{tag}</Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-gray-500">No tags</span>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-4 border-t mt-4">
-              <div className="text-xs text-gray-500">Created on {format(new Date(contact.created_at), 'PPP')}</div>
-              <div className="text-xs text-gray-500">Last updated {format(new Date(contact.updated_at), 'PPP')}</div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Tabs for Related Content */}
-        <div className="lg:col-span-2">
-          <Tabs defaultValue="deals">
-            <TabsList className="grid grid-cols-4 mb-4">
-              <TabsTrigger value="deals">
-                Deals ({relatedDeals.length})
-              </TabsTrigger>
-              <TabsTrigger value="activities">
-                Activities ({relatedActivities.length})
-              </TabsTrigger>
-              <TabsTrigger value="notes">
-                Notes ({relatedNotes.length})
-              </TabsTrigger>
-              <TabsTrigger value="persona">
-                Persona
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="deals" className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Related Deals</h3>
-                <Link href={`/deals/new?contactId=${contactId}`}>
-                  <Button size="sm">
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                    Add Deal
-                  </Button>
-                </Link>
-              </div>
-
-              {relatedDeals.length > 0 ? (
-                <div className="space-y-4">
-                  {relatedDeals.map((deal: any) => (
-                    <Card key={deal.id}>
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <DollarSign className="h-4 w-4 text-green-600" />
-                              <Link href={`/deals/${deal.id}`} className="font-medium text-blue-600 hover:underline">
-                                {deal.title}
-                              </Link>
-                            </div>
-                            <div className="text-sm text-gray-600 mt-1">{deal.description}</div>
-                          </div>
-                          <Badge className={getStageColor(deal.stage)}>
-                            {deal.stage.charAt(0).toUpperCase() + deal.stage.slice(1)}
-                          </Badge>
-                        </div>
-                        
-                        <div className="mt-4 flex justify-between">
-                          <div className="text-sm">
-                            <span className="font-medium">${deal.amount?.toLocaleString() || 0}</span>
-                            <span className="text-gray-500 ml-2">({deal.probability}% probability)</span>
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            {deal.expected_close_date ? format(new Date(deal.expected_close_date), 'MMM d, yyyy') : 'No close date'}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <Card>
-                  <CardContent className="p-6 text-center text-gray-500">
-                    <div className="mb-2">No deals associated with this contact yet.</div>
-                    <Link href={`/deals/new?contactId=${contactId}`}>
-                      <Button size="sm" variant="outline">
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        Create a deal
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-
-            <TabsContent value="activities" className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Related Activities</h3>
-                <Link href={`/activities/new?contactId=${contactId}`}>
-                  <Button size="sm">
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                    Add Activity
-                  </Button>
-                </Link>
-              </div>
-
-              {relatedActivities.length > 0 ? (
-                <div className="space-y-4">
-                  {relatedActivities.map((activity: any) => (
-                    <Card key={activity.id}>
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-start gap-3">
-                            <div className="mt-1">{getActivityTypeIcon(activity.type)}</div>
-                            <div>
-                              <div className="font-medium">
-                                {activity.subject}
-                                {activity.completed && (
-                                  <Badge variant="outline" className="ml-2 text-green-600 bg-green-50">
-                                    Completed
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="text-sm text-gray-600 mt-1">{activity.description}</div>
-                            </div>
-                          </div>
-                          <Badge variant="outline">
-                            {activity.priority.charAt(0).toUpperCase() + activity.priority.slice(1)}
-                          </Badge>
-                        </div>
-                        
-                        <div className="mt-4 flex justify-between items-center">
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Clock className="h-4 w-4 mr-1" />
-                            {activity.due_date ? format(new Date(activity.due_date), 'MMM d, yyyy') : 'No due date'}
-                          </div>
-                          <Link href={`/activities/${activity.id}`}>
-                            <Button size="sm" variant="ghost" className="h-8">
-                              <ArrowUpRight className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <Card>
-                  <CardContent className="p-6 text-center text-gray-500">
-                    <div className="mb-2">No activities associated with this contact yet.</div>
-                    <Link href={`/activities/new?contactId=${contactId}`}>
-                      <Button size="sm" variant="outline">
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        Schedule an activity
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-
-            <TabsContent value="notes" className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Notes</h3>
-                <Button size="sm">
-                  <PlusCircle className="h-4 w-4 mr-2" />
-                  Add Note
-                </Button>
-              </div>
-
-              {relatedNotes.length > 0 ? (
-                <div className="space-y-4">
-                  {relatedNotes.map((note: any) => (
-                    <Card key={note.id}>
-                      <CardContent>
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="text-sm text-gray-500">
-                                {format(new Date(note.created_at), 'PPp')}
-                              </p>
-                              <p className="text-sm">{note.content}</p>
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {note.created_by}
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-4 text-gray-500">
-                  No notes yet
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="persona" className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Customer Persona</h3>
-              </div>
-              <CustomerPersonaBuilder />
-            </TabsContent>
-          </Tabs>
+      {/* Persona Builder */}
+      <div className="grid grid-cols-1 gap-6">
+        {/* Only show Persona Builder */}
+        <div className="w-full">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-medium">Customer Persona</h3>
+          </div>
+          <CustomerPersonaBuilder contact={contact} />
         </div>
       </div>
             </div>

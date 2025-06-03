@@ -6,11 +6,23 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { CustomerPersonaInput } from '@/lib/services/persona.service';
 
-export function CustomerPersonaForm({ onSubmit }: { onSubmit: (data: CustomerPersonaInput) => void }) {
+interface ContactData {
+  name: string;
+  jobTitle: string;
+  company: string;
+}
+
+export function CustomerPersonaForm({ 
+  onSubmit, 
+  contactData 
+}: { 
+  onSubmit: (data: CustomerPersonaInput) => void;
+  contactData?: ContactData;
+}) {
   const [formData, setFormData] = useState<CustomerPersonaInput>({
-    name: '',
-    jobTitle: '',
-    company: '',
+    name: contactData?.name || '',
+    jobTitle: contactData?.jobTitle || '',
+    company: contactData?.company || '',
     preferredContactTime: 'morning' as const,
     preferredChannels: [],
     responseTimeExpectation: 'immediate' as const,
